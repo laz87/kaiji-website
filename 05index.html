@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clicker Game</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+       body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #main-screen, #tasks-menu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        #clicker-image {
+          width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-image: url('./kaiji.jpeg');
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            transition: transform 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #token-display, #tasks-button {
+            margin: 20px 0;
+            font-size: 24px;
+        }
+        .task-button {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #2ecc71;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .task-image {
+            width: 50px;
+            height: 50px;
+            margin-right: 10px;
+            background-color: #e74c3c;
+        }
+        .task-info {
+            display: flex;
+            flex-direction: column;
+        }
+        #tasks-menu {
+            display: none;
+        }
+        .back-button {
+            align-self: flex-start;
+            margin: 10px;
+        }
+        .task-image {
+            width: 50px;
+            height: 50px;
+            margin-right: 10px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 5px;
+        }
+        .task-button {
+            width: 90%;
+            max-width: 300px;
+        }
+        /* ... (previous CSS remains the same) ... */
+        #cooldown-timer {
+            margin-top: 10px;
+            font-size: 18px;
+            color: #e74c3c;
+        }
+        /* ... (previous CSS remains the same) ... */
+        #debug-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="main-screen">
+        <div id="token-display">Kaijis: <span id="token-count">0</span></div>
+        <div id="clicker-image">Click me!</div>
+        <div id="cooldown-timer"></div>
+        <button id="tasks-button">Tasks</button>
+        <div id="debug-info"></div>
+    </div>
+    <div id="tasks-menu">
+        <button class="back-button">Back</button>
+        <h2>Tasks</h2>
+        <!-- Task buttons will be dynamically added here -->
+    </div>
+    <script>
+        const tg = window.Telegram.WebApp;
+        let tokens = 0;
+        let clickTokens = 0;
+        let lastClickTime = 0;
+        const CLICK_TOKEN_LIMIT = 500;
+        const COOLDOWN_TIME = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+        const tokenDisplay = document.getElementById('token-count');
+        const clickerImage = document.getElementById('clicker-image');
+        const tasksButton = document.getElementById('tasks-button');
+        const mainScreen = document.getElementById('main-screen');
+        const tasksMenu = document.getElementById('tasks-menu');
+        const backButton = document.querySelector('.back-button');
+        const cooldownTimer = document.getElementById('cooldown-timer');
+        const debugInfo = document.getElementById('debug-info');
+
+        // Initialize Telegram Mini App
+        tg.expand();
+
+        function loadData() {
+            const savedData = JSON.parse(localStorage.getItem('clickerGameData'));
+            if (savedData === null) {
+                // This is a new user
+                tokens = 0;
+                clickTokens = 0;
+                lastClickTime = 0;
+                saveData(); // Save the initial state
+            } else {
+                tokens = savedData.tokens || 0;
+                clickTokens = savedData.clickTokens || 0;
+                lastClickTime = savedData.lastClickTime || 0;
+            }
+            updateTokenDisplay();
+            checkCooldown();
+            updateDebugInfo();
+        }
+
+        function saveData() {
+            const dataToSave = {
+                tokens: tokens,
+                clickTokens: clickTokens,
+                lastClickTime: lastClickTime
+            };
+            localStorage.setItem('clickerGameData', JSON.stringify(dataToSave));
+            updateDebugInfo();
+        }
+
+       
+        function updateTokenDisplay() {
+            tokenDisplay.textContent = tokens;
+        }
+
+        function checkCooldown() {
+            const currentTime = Date.now();
+            const timeSinceLastClick = currentTime - lastClickTime;
+            
+            if (clickTokens >= CLICK_TOKEN_LIMIT && timeSinceLastClick < COOLDOWN_TIME) {
+                const remainingTime = COOLDOWN_TIME - timeSinceLastClick;
+                const hours = Math.floor(remainingTime / (60 * 60 * 1000));
+                const minutes = Math.floor((remainingTime % (60 * 60 * 1000)) / (60 * 1000));
+                const seconds = Math.floor((remainingTime % (60 * 1000)) / 1000);
+                cooldownTimer.textContent = `Cooldown: ${hours}h ${minutes}m ${seconds}s`;
+                clickerImage.style.pointerEvents = 'none';
+                clickerImage.style.opacity = '0.5';
+            } else {
+                cooldownTimer.textContent = '';
+                clickerImage.style.pointerEvents = 'auto';
+                clickerImage.style.opacity = '1';
+                if (timeSinceLastClick >= COOLDOWN_TIME) {
+                    clickTokens = 0;
+                    saveData();
+                }
+            }
+            updateDebugInfo();
+        }
+
+        function updateDebugInfo() {
+            debugInfo.textContent = `Total Tokens: ${tokens}, Click Tokens: ${clickTokens}, Last Click: ${new Date(lastClickTime).toLocaleString()}`;
+        }
+
+
+
+        loadData();
+
+clickerImage.addEventListener('click', () => {
+    const currentTime = Date.now();
+    if (clickTokens < CLICK_TOKEN_LIMIT || (currentTime - lastClickTime) >= COOLDOWN_TIME) {
+        tokens++;
+        clickTokens++;
+        lastClickTime = currentTime;
+        updateTokenDisplay();
+        saveData();
+        checkCooldown();
+    }
+});
+
+       
+
+        tasksButton.addEventListener('click', () => {
+            mainScreen.style.display = 'none';
+            tasksMenu.style.display = 'flex';
+        });
+
+        backButton.addEventListener('click', () => {
+            tasksMenu.style.display = 'none';
+            mainScreen.style.display = 'flex';
+        });
+
+        const tasks = [
+        { name: "Task 1", points: 10, appUrl: "https://t.me/OfficialBananaBot/banana?startapp=referral=RHS2VN1", imageUrl: "./bananabot.jpeg" },
+            { name: "Task 2", points: 20, appUrl: "https://t.me/gamee/start?startapp=ref_1878094395", imageUrl: "./gamee.png" },
+            { name: "Task 3", points: 30, appUrl: "https://t.me/cexio_tap_bot?start=1719934329745695", imageUrl: "./CEX.png" }
+        ];
+
+        tasks.forEach(task => {
+            const taskButton = document.createElement('button');
+            taskButton.className = 'task-button';
+            taskButton.innerHTML = `
+                <div class="task-image" style="background-image: url('${task.imageUrl}');"></div>
+                <div class="task-info">
+                    <span>${task.name}</span>
+                    <span>Points: ${task.points}</span>
+                </div>
+            `;
+            taskButton.addEventListener('click', () => {
+                tokens += task.points;
+                updateTokenDisplay();
+                saveData();
+                tg.openTelegramLink(task.appUrl);
+            });
+            tasksMenu.appendChild(taskButton);
+        });
+
+        setInterval(checkCooldown, 1000);
+    </script>
+</body>
+</html>
